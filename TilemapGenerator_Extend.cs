@@ -48,12 +48,12 @@ public class TilemapGenerator_Extend : MonoBehaviour
         CreateRange(MaxIsle);
         foreach (var range in rangeList)
         {
-            int[,] isleMap = new MazeCreator_Extend(range.End.X - range.Start.X, range.End.Y - range.Start.Y, PercentageOfMt).CreateMaze();
-            for (int x = range.Start.X; x < range.End.X; x++)
+            int[,] isleMap = new MazeCreator_Extend((range.End.X - range.Start.X) * 2 + 4, (range.End.Y - range.Start.Y) * 2 + 4, PercentageOfMt).CreateMaze();
+            for (int x = range.Start.X * 2; x < range.End.X * 2 + 4; x++)
             {
-                for (int y = range.Start.Y; y < range.End.Y; y++)
+                for (int y = range.Start.Y * 2; y < range.End.Y * 2 + 4; y++)
                 {
-                    map[x, y] = isleMap[x - range.Start.X, y - range.Start.Y];
+                    map[x, y] = isleMap[x - range.Start.X * 2, y - range.Start.Y * 2];
                 }
             }
         }
@@ -83,23 +83,20 @@ public class TilemapGenerator_Extend : MonoBehaviour
             }
         }
         //各島について通らせたくない所に河川を生成
-        foreach (var range in rangeList)
+        for (int x = 0; x < MAP_SIZE_X-1; x++)
         {
-            for (int x = range.Start.X; x < range.End.X; x++)
+            for (int y = 0; y < MAP_SIZE_Y-1; y++)
             {
-                for (int y = range.Start.Y; y < range.End.Y; y++)
+                for (int i = 0; i < Magnification; i++)
                 {
-                    for (int i = 0; i < Magnification; i++)
+                    for (int j = 0; j < Magnification; j++)
                     {
-                        for (int j = 0; j < Magnification; j++)
-                        {
-                            int X = x * Magnification + i + OutSea, Y = y * Magnification + j + OutSea;
+                        int X = x * Magnification + i + OutSea, Y = y * Magnification + j + OutSea;
 
-                            if (((map[x, y] != 1 && map[x + 1, y] != 1 && j == 0) || (map[x, y] != 1 && map[x, y + 1] != 1 && i == 0))
-                                && heightmap[X, Y] < Chips[0].Key)
-                            {
-                                heightmap[X, Y] = 0;
-                            }
+                        if (((map[x, y] != 1 && map[x + 1, y] != 1 && j == 0) || (map[x, y] != 1 && map[x, y + 1] != 1 && i == 0))
+                            && heightmap[X, Y] < Chips[0].Key)
+                        {
+                            heightmap[X, Y] = 0;
                         }
                     }
                 }
@@ -130,7 +127,7 @@ public class TilemapGenerator_Extend : MonoBehaviour
     public void CreateRange(int maxRoom)
     {
         // 区画のリストの初期値としてマップ全体を入れる
-        rangeList.Add(new Range(0, 0, MAP_SIZE_X - 1, MAP_SIZE_Y - 1));
+        rangeList.Add(new Range(0, 0, MAP_SIZE_X / 2 - 2, MAP_SIZE_Y / 2 - 2));
 
         bool isDevided;
         do

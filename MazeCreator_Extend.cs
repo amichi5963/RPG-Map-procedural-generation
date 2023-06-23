@@ -23,9 +23,10 @@ public class MazeCreator_Extend : MonoBehaviour
     public MazeCreator_Extend(int width, int height, int percentageOfMt)
     {
         // 5–¢–‚ÌƒTƒCƒY‚â‹ô”‚Å‚Í¶¬‚Å‚«‚È‚¢
-        if (width < 5 || height < 5) throw new ArgumentOutOfRangeException();
         if (width % 2 == 0) width++;
         if (height % 2 == 0) height++;
+        if (width < 5 || height < 5) throw new ArgumentOutOfRangeException();
+
 
         // –À˜Hî•ñ‚ğ‰Šú‰»
         this.Width = width;
