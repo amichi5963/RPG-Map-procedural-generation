@@ -2,9 +2,9 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class MoveCharactorController : MonoBehaviour
+public class Player : MonoBehaviour
 {
-    [SerializeField]private float speed = 0.05f;
+    [SerializeField] private float speed = 0.05f;
 
     void Start()
     {

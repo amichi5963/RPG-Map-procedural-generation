@@ -9,8 +9,11 @@ using Random = UnityEngine.Random;
 public class TilemapGenerator_Extend : MonoBehaviour
 {
     [SerializeField] private List<SerializableKeyPair<float, RuleTile>> Chips = default;
+    [SerializeField] private RuleTile BridgeTile;
     [SerializeField] Grid grid;
     [SerializeField] Tilemap tilemap;
+    [SerializeField] Tilemap seaTilemap;
+    [SerializeField] Tilemap mountainTilemap;
     [SerializeField] int MAP_SIZE_X = 7;
     [SerializeField] int MAP_SIZE_Y = 7;
     [SerializeField] int Magnification = 7;
@@ -23,7 +26,9 @@ public class TilemapGenerator_Extend : MonoBehaviour
     [SerializeField] int MINIMUM_RANGE_WIDTH = 6;
     private int[,] map;
     private float[,] heightmap;
-    private List<Range> rangeList = new List<Range>();
+    private List<Range> rangeList;//島の矩形のリスト
+    private List<Range> passList;//海のリスト
+    private List<Range> bridgeList;//橋のリスト
 
     void Start()
     {
@@ -43,8 +48,10 @@ public class TilemapGenerator_Extend : MonoBehaviour
     void GenerateTilemap()
     {
         map = new int[MAP_SIZE_X, MAP_SIZE_Y];
+        rangeList = new List<Range>();
+        passList = new List<Range>();
+        bridgeList = new List<Range>();
 
-        rangeList.Clear();
         CreateRange(MaxIsle);
         foreach (var range in rangeList)
         {
@@ -83,9 +90,9 @@ public class TilemapGenerator_Extend : MonoBehaviour
             }
         }
         //各島について通らせたくない所に河川を生成
-        for (int x = 0; x < MAP_SIZE_X-1; x++)
+        for (int x = 0; x < MAP_SIZE_X - 1; x++)
         {
-            for (int y = 0; y < MAP_SIZE_Y-1; y++)
+            for (int y = 0; y < MAP_SIZE_Y - 1; y++)
             {
                 for (int i = 0; i < Magnification; i++)
                 {
@@ -106,18 +113,41 @@ public class TilemapGenerator_Extend : MonoBehaviour
 
     void DrawTilemap()
     {
+        //基本的な地形(高低)の記述
         for (int i = 0; i < heightmap.GetLength(0); i++)
         {
             for (int j = 0; j < heightmap.GetLength(1); j++)
             {
                 float height = heightmap[i, j];
                 Vector3Int position = new Vector3Int(i, j, 0);
+                int counter = 0;
                 foreach (SerializableKeyPair<float, RuleTile> item in Chips)
                 {
                     if (height > item.Key)
                     {
-                        tilemap.SetTile(position, item.Value);
+                        if(counter == 0)
+                        mountainTilemap.SetTile(position, item.Value);
+                        else if(counter==Chips.Count - 1)
+                            seaTilemap.SetTile(position, item.Value);
+                        else
+                            tilemap.SetTile(position, item.Value);
                         break;
+                    }
+                }
+            }
+        }
+        //橋の記述
+        foreach (var range in bridgeList)
+        {
+            for (int i = range.Start.X * 2 * Magnification + Magnification * 3; i <= range.End.X * 2 * Magnification + Magnification * 3; i++)
+            {
+                for (int j = range.Start.Y * 2 * Magnification + Magnification * 3; j <= range.End.Y * 2 * Magnification + Magnification * 3; j++)
+                {
+                    //そのマスが通行不能である場合　橋をかける
+                    if (heightmap[i, j] <= Chips[Chips.Count - 2].Key || heightmap[i, j] >= Chips[0].Key)
+                    {
+                        Vector3Int position = new Vector3Int(i, j, 0);
+                        tilemap.SetTile(position, BridgeTile);
                     }
                 }
             }
@@ -142,7 +172,6 @@ public class TilemapGenerator_Extend : MonoBehaviour
                 break;
             }
         } while (isDevided);
-
     }
     public bool DevideRange(bool isVertical)
     {
@@ -182,11 +211,17 @@ public class TilemapGenerator_Extend : MonoBehaviour
             Range newRange = new Range();
             if (isVertical)
             {
+                Range pass = new Range(range.Start.X - 1, devideIndex, range.End.X + 1, devideIndex);
+                passList.Add(pass);
+                CreateBridge(pass, isVertical);
                 newRange = new Range(range.Start.X, devideIndex + 1, range.End.X, range.End.Y);
                 range.End.Y = devideIndex - 1;
             }
             else
             {
+                Range pass = new Range(devideIndex, range.Start.Y - 1, devideIndex, range.End.Y + 1);
+                passList.Add(pass);
+                CreateBridge(pass, isVertical);
                 newRange = new Range(devideIndex + 1, range.Start.Y, range.End.X, range.End.Y);
                 range.End.X = devideIndex - 1;
             }
@@ -201,6 +236,22 @@ public class TilemapGenerator_Extend : MonoBehaviour
         rangeList.AddRange(newRangeList);
 
         return isDevided;
+    }
+
+    private void CreateBridge(Range Pass, bool isVertical)
+    {
+        int random;
+        if (isVertical)
+        {
+            random = Pass.Start.X + RogueUtils.GetRandomInt(1, Pass.GetWidthX()-1);
+            bridgeList.Add(new Range(random, Pass.Start.Y, random, Pass.Start.Y+1));
+        }
+        else
+        {
+            random = Pass.Start.Y + RogueUtils.GetRandomInt(1, Pass.GetWidthY()-1);
+            bridgeList.Add(new Range(Pass.End.X, random, Pass.End.X + 1, random));
+        }
+
     }
 
     public static float BilinearInterpolation(float x, float y, float q11, float q12, float q21, float q22)
