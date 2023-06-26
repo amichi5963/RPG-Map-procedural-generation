@@ -10,10 +10,12 @@ public class TilemapGenerator_Extend : MonoBehaviour
 {
     [SerializeField] private List<SerializableKeyPair<float, RuleTile>> Chips = default;
     [SerializeField] private RuleTile BridgeTile;
+    [SerializeField] private RuleTile TownTile;
     [SerializeField] Grid grid;
     [SerializeField] Tilemap tilemap;
     [SerializeField] Tilemap seaTilemap;
     [SerializeField] Tilemap mountainTilemap;
+    [SerializeField] Tilemap ColliderTilemap;
     [SerializeField] int MAP_SIZE_X = 7;
     [SerializeField] int MAP_SIZE_Y = 7;
     [SerializeField] int Magnification = 7;
@@ -29,6 +31,7 @@ public class TilemapGenerator_Extend : MonoBehaviour
     private List<Range> rangeList;//島の矩形のリスト
     private List<Range> passList;//海のリスト
     private List<Range> bridgeList;//橋のリスト
+    private List<Position> TownList;//城とか村とかのリスト
 
     void Start()
     {
@@ -51,11 +54,31 @@ public class TilemapGenerator_Extend : MonoBehaviour
         rangeList = new List<Range>();
         passList = new List<Range>();
         bridgeList = new List<Range>();
+        TownList = new List<Position>();
 
+        //島区分と橋の生成
         CreateRange(MaxIsle);
         foreach (var range in rangeList)
         {
+            //島の生成
             int[,] isleMap = new MazeCreator_Extend((range.End.X - range.Start.X) * 2 + 4, (range.End.Y - range.Start.Y) * 2 + 4, PercentageOfMt).CreateMaze();
+            //島に城を二つづつ配置
+            int[,] meiro = new int[isleMap.GetLength(0), isleMap.GetLength(1)];
+            for (int i = 0; i < isleMap.GetLength(0); i++)
+            {
+                for (int j = 0; j < isleMap.GetLength(1); j++)
+                {
+                    meiro[i, j] = isleMap[i, j] == 1 ? 0 : 1;
+                }
+            }
+            Position start = search_far(new Position(Random.Range(0, (isleMap.GetLength(0) - 1) / 2) * 2 + 1, Random.Range(0, (isleMap.GetLength(1) - 1) / 2) * 2 + 1), meiro);
+            Position goal = search_far(start, meiro);
+            start.X += range.Start.X * 2;
+            start.Y += range.Start.Y * 2;
+            goal.X += range.Start.X * 2;
+            goal.Y += range.Start.Y * 2;
+            TownList.Add(start);
+            TownList.Add(goal);
             for (int x = range.Start.X * 2; x < range.End.X * 2 + 4; x++)
             {
                 for (int y = range.Start.Y * 2; y < range.End.Y * 2 + 4; y++)
@@ -113,6 +136,10 @@ public class TilemapGenerator_Extend : MonoBehaviour
 
     void DrawTilemap()
     {
+        tilemap.ClearAllTiles();
+        seaTilemap.ClearAllTiles();
+        mountainTilemap.ClearAllTiles();
+        ColliderTilemap.ClearAllTiles();
         //基本的な地形(高低)の記述
         for (int i = 0; i < heightmap.GetLength(0); i++)
         {
@@ -125,14 +152,25 @@ public class TilemapGenerator_Extend : MonoBehaviour
                 {
                     if (height > item.Key)
                     {
-                        if(counter == 0)
-                        mountainTilemap.SetTile(position, item.Value);
-                        else if(counter==Chips.Count - 1)
+                        if (counter == 0)
+                        {
+                            mountainTilemap.SetTile(position, item.Value);
+                            ColliderTilemap.SetTile(position, item.Value);
+                        }
+                        else if (counter == Chips.Count - 1)
+                        {
                             seaTilemap.SetTile(position, item.Value);
+                            ColliderTilemap.SetColliderType(position, Tile.ColliderType.Grid);
+                            ColliderTilemap.SetTile(position, item.Value);
+                        }
                         else
                             tilemap.SetTile(position, item.Value);
+                        {
+                            ColliderTilemap.SetColliderType(position, Tile.ColliderType.None);
+                        }
                         break;
                     }
+                    counter++;
                 }
             }
         }
@@ -148,8 +186,26 @@ public class TilemapGenerator_Extend : MonoBehaviour
                     {
                         Vector3Int position = new Vector3Int(i, j, 0);
                         tilemap.SetTile(position, BridgeTile);
+                        ColliderTilemap.SetTile(position, null);
                     }
                 }
+            }
+        }
+        foreach (var pos in TownList)
+        {
+            int i = pos.X * Magnification + OutSea;
+            int j = pos.Y * Magnification + OutSea;
+            Vector3Int position = new Vector3Int(i, j, 0);
+            var positionArray = new[]
+            {
+                position,
+                new Vector3Int( 1, 0, 0 )+position,
+                new Vector3Int( 1, 1, 0 )+position,
+                new Vector3Int( 0, 1, 0 )+position
+            };
+            foreach (var p in positionArray)
+            {
+                tilemap.SetTile(p, TownTile);
             }
         }
     }
@@ -211,7 +267,7 @@ public class TilemapGenerator_Extend : MonoBehaviour
             Range newRange = new Range();
             if (isVertical)
             {
-                Range pass = new Range(range.Start.X - 1, devideIndex, range.End.X + 1, devideIndex);
+                Range pass = new Range(range.Start.X - 1, devideIndex, range.End.X, devideIndex);
                 passList.Add(pass);
                 CreateBridge(pass, isVertical);
                 newRange = new Range(range.Start.X, devideIndex + 1, range.End.X, range.End.Y);
@@ -219,7 +275,7 @@ public class TilemapGenerator_Extend : MonoBehaviour
             }
             else
             {
-                Range pass = new Range(devideIndex, range.Start.Y - 1, devideIndex, range.End.Y + 1);
+                Range pass = new Range(devideIndex, range.Start.Y - 1, devideIndex, range.End.Y);
                 passList.Add(pass);
                 CreateBridge(pass, isVertical);
                 newRange = new Range(devideIndex + 1, range.Start.Y, range.End.X, range.End.Y);
@@ -243,17 +299,134 @@ public class TilemapGenerator_Extend : MonoBehaviour
         int random;
         if (isVertical)
         {
-            random = Pass.Start.X + RogueUtils.GetRandomInt(1, Pass.GetWidthX()-1);
-            bridgeList.Add(new Range(random, Pass.Start.Y, random, Pass.Start.Y+1));
+            random = Pass.Start.X + RogueUtils.GetRandomInt(1, Pass.GetWidthX());
+            bridgeList.Add(new Range(random, Pass.Start.Y, random, Pass.Start.Y + 1));
         }
         else
         {
-            random = Pass.Start.Y + RogueUtils.GetRandomInt(1, Pass.GetWidthY()-1);
+            random = Pass.Start.Y + RogueUtils.GetRandomInt(1, Pass.GetWidthY());
             bridgeList.Add(new Range(Pass.End.X, random, Pass.End.X + 1, random));
         }
 
     }
 
+    // 上下左右シャッフル
+    Position[] shuffle(Position[] direction)
+    {
+        int j;
+        Position tmp;
+        for (int i = 0; i < 4; i++)
+        {
+            j = Random.Range(0, 3);
+            tmp = direction[i];
+            direction[i] = direction[j];
+            direction[j] = tmp;
+        }
+        return direction;
+    }
+
+    //ある迷路meiroの地点pから最も遠い点を検索(幅優先) meiroは0を通路、1を壁とする。
+    Position search_far(Position p, int[,] meiro)
+    {
+        int[,] meiro_2 = (int[,])meiro.Clone();
+        int w = meiro_2.GetLength(0), h = meiro_2.GetLength(1);
+        Position n = new Position();
+        int sx, sy;
+
+        tilemap.ClearAllTiles();
+        Position[,] direction = new Position[w, h]; // 辿ってきた方向を記憶する配列(要素はd[4]のどれか)
+        Position[] d = new Position[4]{new Position(0, 1),
+                    new Position(0, -1),
+                    new Position(1, 0),
+                    new Position(-1, 0)}; // 進む方向	
+        Queue<Position> path = new Queue<Position>();
+        // スタートを追加
+        path.Enqueue(p);
+
+        // 繰り返し探索
+        while (path.Count != 0)
+        {
+            n = path.Dequeue();
+            Debug.Log("search = " + n.X + "," + n.Y);
+            // printf ("%d\n", pathend);
+            meiro_2[n.X, n.Y] = 2; // 対応する座標を探索済みにする
+            shuffle(d); // ランダム性を持たせるためシャッフル
+                        // printf("%d,%d\n",d[0].x,d[0].y);
+            for (int i = 0; i < 4; i++)
+            {
+                sx = n.X + d[i].X; // 隣接マスのx座標
+                sy = n.Y + d[i].Y; // 隣接マスのy座標
+                if (meiro_2[sx, sy] == 0)
+                { // 隣接マスが未探索の道のとき
+                    path.Enqueue(new Position(sx, sy));
+                }
+            }
+        }
+        return n;
+    }
+
+    //幅優先探索
+    int[,] search_meiro(int w, int h, Position start, Position goal, int[,] isleMap)
+    {
+        int[,] meiro = new int[isleMap.GetLength(0), isleMap.GetLength(1)];
+        for (int i = 0; i < isleMap.GetLength(0); i++)
+        {
+            for (int j = 0; j < isleMap.GetLength(1); j++)
+            {
+                meiro[i, j] = isleMap[i, j] == 1 ? 0 : 1;
+            }
+        }
+        Position n;
+        int sx, sy;
+        Position[,] direction = new Position[w, h]; // 辿ってきた方向を記憶する配列(要素はd[4]のどれか)
+        Position[] d = new Position[4]{new Position(0, 1),
+                    new Position(0, -1),
+                    new Position(1, 0),
+                    new Position(-1, 0)}; // 進む方向	
+        Queue<Position> path = new Queue<Position>();
+        // スタートを追加
+        path.Enqueue(start);
+
+        // 繰り返し探索
+        while (path.Count != 0)
+        {
+            n = path.Dequeue();
+            // printf("search = (%d, %d)\n", n.x, n.y);
+            // printf ("%d\n", pathend);
+            meiro[n.X, n.X] = 2; // 対応する座標を探索済みにする
+            if (n.X == goal.X && n.Y == goal.Y)
+            { // ゴール処理
+                while (n.X != start.X || n.Y != start.Y)
+                {
+                    // 値を更新
+                    sx = n.X;
+                    sy = n.Y;
+                    // printf("PATH = (%d, %d)\n", n.x, n.y);
+                    // マーキング
+                    meiro[n.X, n.Y] = 3;
+                    // 来た道を戻る
+                    n.X -= direction[sx, sy].X;
+                    n.Y -= direction[sx, sy].Y;
+                }
+                return meiro;
+            }
+            else
+            { // 探索処理
+                for (int i = 0; i < 4; i++)
+                {
+                    sx = n.X + d[i].X; // 隣接マスのx座標
+                    sy = n.Y + d[i].Y; // 隣接マスのy座標
+                    if (meiro[sx, sy] == 0)
+                    { // 隣接マスが未探索の道のとき
+                        path.Enqueue(new Position(sx, sy));
+                        direction[sx, sy] = d[i];
+                    }
+                }
+            }
+        }
+        Debug.Log("I cannot find the goal...");
+        return meiro;
+    }
     public static float BilinearInterpolation(float x, float y, float q11, float q12, float q21, float q22)
     {
         //線形補完

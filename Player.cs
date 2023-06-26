@@ -5,29 +5,36 @@ using UnityEngine;
 public class Player : MonoBehaviour
 {
     [SerializeField] private float speed = 0.05f;
+    private Animator animator;
 
     void Start()
     {
+        animator=GetComponent<Animator>();
     }
 
     void Update()
     {
         Vector2 position = transform.position;
         float moves = speed * Time.deltaTime;
+        animator.SetBool("isWalking", false);
         if (Input.GetKey("left"))
         {
+            animator.SetBool("isWalking", true);
             position.x -= moves;
         }
-        else if (Input.GetKey("right"))
+        if (Input.GetKey("right"))
         {
+            animator.SetBool("isWalking", true);
             position.x += moves;
         }
-        else if (Input.GetKey("up"))
+        if (Input.GetKey("up"))
         {
+            animator.SetBool("isWalking", true);
             position.y += moves;
         }
-        else if (Input.GetKey("down"))
+        if (Input.GetKey("down"))
         {
+            animator.SetBool("isWalking", true);
             position.y -= moves;
         }
 
