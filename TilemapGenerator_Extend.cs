@@ -8,7 +8,7 @@ using Random = UnityEngine.Random;
 
 public class TilemapGenerator_Extend : MonoBehaviour
 {
-    [SerializeField] private List<SerializableKeyPair<float, RuleTile>> Chips = default;
+    [SerializeField] private List<SerializableKeyPair<SerializableKeyPair<float, float>, RuleTile>> Chips = default;
     [SerializeField] private RuleTile BridgeTile;
     [SerializeField] private RuleTile TownTile;
     [SerializeField] Grid grid;
@@ -27,7 +27,7 @@ public class TilemapGenerator_Extend : MonoBehaviour
     [SerializeField] float NoizCycle = -0.2f;
     [SerializeField] int MINIMUM_RANGE_WIDTH = 6;
     private int[,] map;
-    private float[,] heightmap;
+    private Mass[,] Massmap;
     private List<Range> rangeList;//島の矩形のリスト
     private List<Range> passList;//海のリスト
     private List<Range> bridgeList;//橋のリスト
@@ -55,6 +55,7 @@ public class TilemapGenerator_Extend : MonoBehaviour
         passList = new List<Range>();
         bridgeList = new List<Range>();
         TownList = new List<Position>();
+        Massmap = new Mass[(MAP_SIZE_X + 1) * Magnification + OutSea * 2, (MAP_SIZE_Y + 1) * Magnification + OutSea * 2];
 
         //島区分と橋の生成
         CreateRange(MaxIsle);
@@ -73,10 +74,10 @@ public class TilemapGenerator_Extend : MonoBehaviour
             }
             Position start = search_far(new Position(Random.Range(0, (isleMap.GetLength(0) - 1) / 2) * 2 + 1, Random.Range(0, (isleMap.GetLength(1) - 1) / 2) * 2 + 1), meiro);
             Position goal = search_far(start, meiro);
-            start.X += range.Start.X * 2;
-            start.Y += range.Start.Y * 2;
-            goal.X += range.Start.X * 2;
-            goal.Y += range.Start.Y * 2;
+            start.X = (start.X + (range.Start.X * 2)) * Magnification + OutSea;
+            start.Y = (start.Y + (range.Start.Y * 2)) * Magnification + OutSea;
+            goal.X = (goal.X + (range.Start.X * 2)) * Magnification + OutSea;
+            goal.Y = (goal.Y + (range.Start.Y * 2)) * Magnification + OutSea;
             TownList.Add(start);
             TownList.Add(goal);
             for (int x = range.Start.X * 2; x < range.End.X * 2 + 4; x++)
@@ -88,8 +89,22 @@ public class TilemapGenerator_Extend : MonoBehaviour
             }
         }
 
-        heightmap = new float[(MAP_SIZE_X + 1) * Magnification + OutSea * 2, (MAP_SIZE_Y + 1) * Magnification + OutSea * 2];
-
+        //高度の生成
+        for (int i = 0; i < Massmap.GetLength(0); i++)
+        {
+            for (int j = 0; j < Massmap.GetLength(1); j++)
+            {
+                Massmap[i, j] = new Mass(i, j);
+                Massmap[i, j].Threshold.Add(1.8f);
+                Massmap[i, j].Threshold.Add(1.4f);
+                Massmap[i, j].Threshold.Add(0.8f);
+                Massmap[i, j].Threshold.Add(0.4f);
+                Massmap[i, j].Threshold.Add(float.MinValue);
+            }
+        }
+        float ParlinX = Random.value, ParlinY = Random.value;
+        float DesertOriginX = Random.value, DesertOriginY = Random.value;
+        float SwampOriginX = Random.value, SwampOriginY = Random.value;
         for (int x = 0; x < MAP_SIZE_X - 1; x++)
         {
             for (int y = 0; y < MAP_SIZE_Y - 1; y++)
@@ -100,18 +115,18 @@ public class TilemapGenerator_Extend : MonoBehaviour
                     {
                         int X = x * Magnification + i + OutSea, Y = y * Magnification + j + OutSea;
                         //線形補完でマップを拡大
-                        heightmap[X, Y] =
+                        Massmap[X, Y].Height =
                             BilinearInterpolation((float)i / Magnification, (float)j / Magnification,
                             map[x, y], map[x, y + 1],
                             map[x + 1, y], map[x + 1, y + 1]);
 
                         //乱数でゆらがせる
-                        if (heightmap[X, Y] != 0) heightmap[X, Y] += Mathf.PerlinNoise(X * NoizCycle, Y * NoizCycle) * (NoizMax - NoizMin) + NoizMin;
-
+                        if (Massmap[X, Y].Height != 0) Massmap[X, Y].Height += Mathf.PerlinNoise(X * NoizCycle + ParlinX, Y * NoizCycle + ParlinY) * (NoizMax - NoizMin) + NoizMin;
                     }
                 }
             }
         }
+
         //各島について通らせたくない所に河川を生成
         for (int x = 0; x < MAP_SIZE_X - 1; x++)
         {
@@ -124,14 +139,31 @@ public class TilemapGenerator_Extend : MonoBehaviour
                         int X = x * Magnification + i + OutSea, Y = y * Magnification + j + OutSea;
 
                         if (((map[x, y] != 1 && map[x + 1, y] != 1 && j == 0) || (map[x, y] != 1 && map[x, y + 1] != 1 && i == 0))
-                            && heightmap[X, Y] < Chips[0].Key)
+                            && Massmap[X, Y].getTerrainType() != 0)
                         {
-                            heightmap[X, Y] = 0;
+                            Massmap[X, Y].Height = 0f;
                         }
                     }
                 }
             }
         }
+        //橋の記述
+        foreach (var range in bridgeList)
+        {
+            for (int i = (range.Start.X * 2 + 1) * Magnification + OutSea; i <= (range.End.X * 2 + 1) * Magnification + OutSea; i++)
+            {
+                for (int j = (range.Start.Y * 2 + 1) * Magnification + OutSea; j <= (range.End.Y * 2 + 1) * Magnification + OutSea; j++)
+                {
+                    //そのマスが通行不能である場合　橋をかける
+                    if (!Massmap[i, j].CanWalk())
+                    {
+                        Massmap[i, j].hasBridge = true;
+                    }
+                }
+            }
+        }
+        //道の生成
+        //RoadLiner.GenerateRoad(Massmap, TownList[0], TownList[TownList.Count - 1]);
     }
 
     void DrawTilemap()
@@ -140,61 +172,53 @@ public class TilemapGenerator_Extend : MonoBehaviour
         seaTilemap.ClearAllTiles();
         mountainTilemap.ClearAllTiles();
         ColliderTilemap.ClearAllTiles();
+
         //基本的な地形(高低)の記述
-        for (int i = 0; i < heightmap.GetLength(0); i++)
+        for (int i = 0; i < Massmap.GetLength(0); i++)
         {
-            for (int j = 0; j < heightmap.GetLength(1); j++)
+            for (int j = 0; j < Massmap.GetLength(1); j++)
             {
-                float height = heightmap[i, j];
                 Vector3Int position = new Vector3Int(i, j, 0);
-                int counter = 0;
-                foreach (SerializableKeyPair<float, RuleTile> item in Chips)
+
+                if (Massmap[i, j].hasBridge)
                 {
-                    if (height > item.Key)
-                    {
-                        if (counter == 0)
-                        {
-                            mountainTilemap.SetTile(position, item.Value);
-                            ColliderTilemap.SetTile(position, item.Value);
-                        }
-                        else if (counter == Chips.Count - 1)
-                        {
-                            seaTilemap.SetTile(position, item.Value);
-                            ColliderTilemap.SetColliderType(position, Tile.ColliderType.Grid);
-                            ColliderTilemap.SetTile(position, item.Value);
-                        }
-                        else
-                            tilemap.SetTile(position, item.Value);
-                        {
-                            ColliderTilemap.SetColliderType(position, Tile.ColliderType.None);
-                        }
-                        break;
-                    }
-                    counter++;
+                    tilemap.SetTile(position, BridgeTile);
+                    seaTilemap.SetTile(position, Chips[Chips.Count - 1].Value);
+                    continue;
                 }
-            }
-        }
-        //橋の記述
-        foreach (var range in bridgeList)
-        {
-            for (int i = range.Start.X * 2 * Magnification + Magnification * 3; i <= range.End.X * 2 * Magnification + Magnification * 3; i++)
-            {
-                for (int j = range.Start.Y * 2 * Magnification + Magnification * 3; j <= range.End.Y * 2 * Magnification + Magnification * 3; j++)
+                else if (Massmap[i, j].IsRoad)
                 {
-                    //そのマスが通行不能である場合　橋をかける
-                    if (heightmap[i, j] <= Chips[Chips.Count - 2].Key || heightmap[i, j] >= Chips[0].Key)
+                    Debug.Log("Road");
+                    tilemap.SetTile(position, BridgeTile);
+                    continue;
+                }
+                else
+                {
+                    int counter = Massmap[i, j].getTerrainType();
+                    switch (counter)
                     {
-                        Vector3Int position = new Vector3Int(i, j, 0);
-                        tilemap.SetTile(position, BridgeTile);
-                        ColliderTilemap.SetTile(position, null);
+                        case 0:
+                            mountainTilemap.SetTile(position, Chips[0].Value);
+                            break;
+                        case -1:
+                            seaTilemap.SetTile(position, Chips[Chips.Count - 1].Value);
+                            break;
+                        default:
+                            if (counter == Chips.Count - 1)
+                                seaTilemap.SetTile(position, Chips[Chips.Count - 1].Value);
+
+                            else
+                                tilemap.SetTile(position, Chips[counter].Value);
+                            break;
                     }
                 }
             }
         }
+        //城の記述
         foreach (var pos in TownList)
         {
-            int i = pos.X * Magnification + OutSea;
-            int j = pos.Y * Magnification + OutSea;
+            int i = pos.X;
+            int j = pos.Y;
             Vector3Int position = new Vector3Int(i, j, 0);
             var positionArray = new[]
             {
@@ -347,11 +371,8 @@ public class TilemapGenerator_Extend : MonoBehaviour
         while (path.Count != 0)
         {
             n = path.Dequeue();
-            Debug.Log("search = " + n.X + "," + n.Y);
-            // printf ("%d\n", pathend);
             meiro_2[n.X, n.Y] = 2; // 対応する座標を探索済みにする
             shuffle(d); // ランダム性を持たせるためシャッフル
-                        // printf("%d,%d\n",d[0].x,d[0].y);
             for (int i = 0; i < 4; i++)
             {
                 sx = n.X + d[i].X; // 隣接マスのx座標
