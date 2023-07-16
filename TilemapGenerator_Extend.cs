@@ -56,13 +56,34 @@ public class TilemapGenerator_Extend : MonoBehaviour
         bridgeList = new List<Range>();
         TownList = new List<Position>();
         Massmap = new Mass[(MAP_SIZE_X + 1) * Magnification + OutSea * 2, (MAP_SIZE_Y + 1) * Magnification + OutSea * 2];
-
+        for (int i = 0; i < Massmap.GetLength(0); i++)
+        {
+            for (int j = 0; j < Massmap.GetLength(1); j++)
+            {
+                Massmap[i, j] = new Mass(i, j);
+            }
+        }
         //島区分と橋の生成
         CreateRange(MaxIsle);
         foreach (var range in rangeList)
         {
+            List<float> floats = new List<float>();
+            for (var i = 0; i < Chips.Count; i++)
+            {
+                floats.Add(Random.Range(Chips[i].Key.Key, Chips[i].Key.Value));
+            }
+
+            for (int i = (range.Start.X * 2) * Magnification + OutSea; i < (range.End.X * 2+4) * Magnification + OutSea; i++)
+            {
+                for (int j = (range.Start.Y * 2) * Magnification + OutSea; j < (range.End.Y * 2+4) * Magnification + OutSea; j++)
+                {
+                    Debug.Log(i+","+j);
+                    Massmap[i, j].Threshold = floats;
+                }
+            }
+
             //島の生成
-            int[,] isleMap = new MazeCreator_Extend((range.End.X - range.Start.X) * 2 + 4, (range.End.Y - range.Start.Y) * 2 + 4, PercentageOfMt).CreateMaze();
+            int[,] isleMap = new MazeCreator_Extend((range.End.X - range.Start.X + 2) * 2, (range.End.Y - range.Start.Y + 2) * 2, PercentageOfMt).CreateMaze();
             //島に城を二つづつ配置
             int[,] meiro = new int[isleMap.GetLength(0), isleMap.GetLength(1)];
             for (int i = 0; i < isleMap.GetLength(0); i++)
@@ -90,18 +111,7 @@ public class TilemapGenerator_Extend : MonoBehaviour
         }
 
         //高度の生成
-        for (int i = 0; i < Massmap.GetLength(0); i++)
-        {
-            for (int j = 0; j < Massmap.GetLength(1); j++)
-            {
-                Massmap[i, j] = new Mass(i, j);
-                Massmap[i, j].Threshold.Add(1.8f);
-                Massmap[i, j].Threshold.Add(1.4f);
-                Massmap[i, j].Threshold.Add(0.8f);
-                Massmap[i, j].Threshold.Add(0.4f);
-                Massmap[i, j].Threshold.Add(float.MinValue);
-            }
-        }
+
         float ParlinX = Random.value, ParlinY = Random.value;
         float DesertOriginX = Random.value, DesertOriginY = Random.value;
         float SwampOriginX = Random.value, SwampOriginY = Random.value;
@@ -150,9 +160,9 @@ public class TilemapGenerator_Extend : MonoBehaviour
         //橋の記述
         foreach (var range in bridgeList)
         {
-            for (int i = (range.Start.X * 2 + 1) * Magnification + OutSea; i <= (range.End.X * 2 + 1) * Magnification + OutSea; i++)
+            for (int i = (range.Start.X * 2+1) * Magnification + OutSea; i <= (range.End.X * 2+1) * Magnification + OutSea; i++)
             {
-                for (int j = (range.Start.Y * 2 + 1) * Magnification + OutSea; j <= (range.End.Y * 2 + 1) * Magnification + OutSea; j++)
+                for (int j = (range.Start.Y * 2+1) * Magnification + OutSea; j <= (range.End.Y * 2+1) * Magnification + OutSea; j++)
                 {
                     //そのマスが通行不能である場合　橋をかける
                     if (!Massmap[i, j].CanWalk())

@@ -25,6 +25,10 @@ public class Mass
     public List<float> Threshold { get; set; }
     public bool hasBridge { get; set; }
     public bool IsRoad { get; set; }
+    public void setThreshold(List<float> _threshold)
+    {
+        Threshold = _threshold;
+    }
     public int getTerrainType()
     {
         for (int i = 0; i < Threshold.Count; i++)
