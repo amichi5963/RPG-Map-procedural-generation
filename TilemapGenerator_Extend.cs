@@ -73,11 +73,10 @@ public class TilemapGenerator_Extend : MonoBehaviour
                 floats.Add(Random.Range(Chips[i].Key.Key, Chips[i].Key.Value));
             }
 
-            for (int i = (range.Start.X * 2) * Magnification + OutSea; i < (range.End.X * 2+4) * Magnification + OutSea; i++)
+            for (int i = (range.Start.X * 2) * Magnification + OutSea; i < (range.End.X * 2 + 4) * Magnification + OutSea; i++)
             {
-                for (int j = (range.Start.Y * 2) * Magnification + OutSea; j < (range.End.Y * 2+4) * Magnification + OutSea; j++)
+                for (int j = (range.Start.Y * 2) * Magnification + OutSea; j < (range.End.Y * 2 + 4) * Magnification + OutSea; j++)
                 {
-                    Debug.Log(i+","+j);
                     Massmap[i, j].Threshold = floats;
                 }
             }
@@ -119,6 +118,14 @@ public class TilemapGenerator_Extend : MonoBehaviour
         {
             for (int y = 0; y < MAP_SIZE_Y - 1; y++)
             {
+                //通路であるところに橋を登録　通れなくなった場合橋を生成
+                if (x % 2 == 1 && y % 2 == 1)
+                {
+                    if (map[x, y] == 1 && map[x + 1, y] == 1)
+                        bridgeList.Add(new Range(x / 2, y / 2, x / 2 + 1, y / 2));
+                    if (map[x, y] == 1 && map[x, y + 1] == 1)
+                        bridgeList.Add(new Range(x / 2, y / 2, x / 2, y / 2 + 1));
+                }
                 for (int i = 0; i < Magnification; i++)
                 {
                     for (int j = 0; j < Magnification; j++)
@@ -137,7 +144,7 @@ public class TilemapGenerator_Extend : MonoBehaviour
             }
         }
 
-        //各島について通らせたくない所に河川を生成
+        //各島について通らせたくない所に河川を生成 
         for (int x = 0; x < MAP_SIZE_X - 1; x++)
         {
             for (int y = 0; y < MAP_SIZE_Y - 1; y++)
@@ -160,9 +167,9 @@ public class TilemapGenerator_Extend : MonoBehaviour
         //橋の記述
         foreach (var range in bridgeList)
         {
-            for (int i = (range.Start.X * 2+1) * Magnification + OutSea; i <= (range.End.X * 2+1) * Magnification + OutSea; i++)
+            for (int i = (range.Start.X * 2 + 1) * Magnification + OutSea; i <= (range.End.X * 2 + 1) * Magnification + OutSea; i++)
             {
-                for (int j = (range.Start.Y * 2+1) * Magnification + OutSea; j <= (range.End.Y * 2+1) * Magnification + OutSea; j++)
+                for (int j = (range.Start.Y * 2 + 1) * Magnification + OutSea; j <= (range.End.Y * 2 + 1) * Magnification + OutSea; j++)
                 {
                     //そのマスが通行不能である場合　橋をかける
                     if (!Massmap[i, j].CanWalk())
@@ -254,6 +261,11 @@ public class TilemapGenerator_Extend : MonoBehaviour
         {
             // 縦 → 横 の順番で部屋を区切っていく。一つも区切らなかったら終了
             isDevided = DevideRange(false);
+            // もしくは最大区画数を超えたら終了
+            if (isDevided && rangeList.Count >= maxRoom)
+            {
+                break;
+            }
             isDevided = DevideRange(true) || isDevided;
 
             // もしくは最大区画数を超えたら終了
@@ -262,6 +274,8 @@ public class TilemapGenerator_Extend : MonoBehaviour
                 break;
             }
         } while (isDevided);
+
+        Debug.Log(rangeList.Count);
     }
     public bool DevideRange(bool isVertical)
     {
@@ -281,14 +295,12 @@ public class TilemapGenerator_Extend : MonoBehaviour
                 continue;
             }
 
-            System.Threading.Thread.Sleep(1);
-
-            // 40％の確率で分割しない
-            // ただし、区画の数が1つの時は必ず分割する
-            if (rangeList.Count > 1 && RogueUtils.RandomJadge(0.4f))
-            {
-                continue;
-            }
+            //// 40％の確率で分割しない
+            //// ただし、区画の数が1つの時は必ず分割する
+            //if (rangeList.Count > 1 && RogueUtils.RandomJadge(0.4f))
+            //{
+            //    continue;
+            //}
 
             // 長さから最少の区画サイズ2つ分を引き、残りからランダムで分割位置を決める
             int length = isVertical ? range.GetWidthY() : range.GetWidthX();
