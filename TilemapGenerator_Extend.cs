@@ -167,6 +167,8 @@ public class TilemapGenerator_Extend : MonoBehaviour
         //橋の記述
         foreach (var range in bridgeList)
         {
+            bool isVertical = range.GetWidthY() > 1;
+
             for (int i = (range.Start.X * 2 + 1) * Magnification + OutSea; i <= (range.End.X * 2 + 1) * Magnification + OutSea; i++)
             {
                 for (int j = (range.Start.Y * 2 + 1) * Magnification + OutSea; j <= (range.End.Y * 2 + 1) * Magnification + OutSea; j++)
@@ -174,7 +176,23 @@ public class TilemapGenerator_Extend : MonoBehaviour
                     //そのマスが通行不能である場合　橋をかける
                     if (!Massmap[i, j].CanWalk())
                     {
-                        Massmap[i, j].hasBridge = true;
+                        bool needs = true;
+                        if (isVertical)
+                        {
+                            if (Massmap[i + 1, j - 1].CanWalk() && Massmap[i + 1, j].CanWalk() && Massmap[i + 1, j + 1].CanWalk())
+                                needs = false;
+                            else if (Massmap[i - 1, j - 1].CanWalk() && Massmap[i - 1, j].CanWalk() && Massmap[i - 1, j + 1].CanWalk())
+                                needs = false;
+                        }
+                        else
+                        {
+                            if (Massmap[i - 1, j + 1].CanWalk() && Massmap[i, j + 1].CanWalk() && Massmap[i + 1, j + 1].CanWalk())
+                                needs = false;
+                            else if (Massmap[i - 1, j - 1].CanWalk() && Massmap[i, j - 1].CanWalk() && Massmap[i + 1, j - 1].CanWalk())
+                                needs = false;
+                        }
+                        if (needs)
+                            Massmap[i, j].hasBridge = true;
                     }
                 }
             }
@@ -259,14 +277,15 @@ public class TilemapGenerator_Extend : MonoBehaviour
         bool isDevided;
         do
         {
+            bool ran = Random.Range(0, 2) == 1;
             // 縦 → 横 の順番で部屋を区切っていく。一つも区切らなかったら終了
-            isDevided = DevideRange(false);
+            isDevided = DevideRange(ran);
             // もしくは最大区画数を超えたら終了
             if (isDevided && rangeList.Count >= maxRoom)
             {
                 break;
             }
-            isDevided = DevideRange(true) || isDevided;
+            isDevided = DevideRange(!ran) || isDevided;
 
             // もしくは最大区画数を超えたら終了
             if (rangeList.Count >= maxRoom)
@@ -294,13 +313,6 @@ public class TilemapGenerator_Extend : MonoBehaviour
             {
                 continue;
             }
-
-            //// 40％の確率で分割しない
-            //// ただし、区画の数が1つの時は必ず分割する
-            //if (rangeList.Count > 1 && RogueUtils.RandomJadge(0.4f))
-            //{
-            //    continue;
-            //}
 
             // 長さから最少の区画サイズ2つ分を引き、残りからランダムで分割位置を決める
             int length = isVertical ? range.GetWidthY() : range.GetWidthX();
