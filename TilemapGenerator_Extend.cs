@@ -8,7 +8,8 @@ using Random = UnityEngine.Random;
 
 public class TilemapGenerator_Extend : MonoBehaviour
 {
-    [SerializeField] private List<SerializableKeyPair<SerializableKeyPair<float, float>, RuleTile>> Chips = default;
+    [SerializeField] private List<GameObject> Biomes = default!;
+    private List<List<SerializableKeyPair<SerializableKeyPair<float, float>, RuleTile>>> Chips;
     [SerializeField] private RuleTile BridgeTile;
     [SerializeField] private RuleTile TownTile;
     [SerializeField] Grid grid;
@@ -34,7 +35,31 @@ public class TilemapGenerator_Extend : MonoBehaviour
     private List<Position> TownList;//城とか村とかのリスト
 
     void Start()
-    {
+    {      // BiomeSetterを持つゲームオブジェクトを取得
+
+        for (int i = 0; i < Biomes.Count; i++)
+        {
+            if (Biomes[i] != null)
+            {
+                BiomeSetter biomeSetter = Biomes[i].GetComponent<BiomeSetter>();
+                if (biomeSetter != null)
+                {
+                    if (biomeSetter.Setting != null)
+                        Chips.Add(biomeSetter.Setting);
+                    else
+                        Debug.LogWarning("Setting not found on Biomes[" + i + "] gameObject.");
+
+                }
+                else
+                {
+                    Debug.LogWarning("BiomeSetter component not found on Biomes[" + i + "] gameObject.");
+                }
+            }
+            else
+            {
+                Debug.LogWarning("Biomes[" + i + "] is null.");
+            }
+        }
         GenerateTilemap();
         DrawTilemap();
     }
@@ -67,20 +92,6 @@ public class TilemapGenerator_Extend : MonoBehaviour
         CreateRange(MaxIsle);
         foreach (var range in rangeList)
         {
-            List<float> floats = new List<float>();
-            for (var i = 0; i < Chips.Count; i++)
-            {
-                floats.Add(Random.Range(Chips[i].Key.Key, Chips[i].Key.Value));
-            }
-
-            for (int i = (range.Start.X * 2) * Magnification + OutSea; i < (range.End.X * 2 + 4) * Magnification + OutSea; i++)
-            {
-                for (int j = (range.Start.Y * 2) * Magnification + OutSea; j < (range.End.Y * 2 + 4) * Magnification + OutSea; j++)
-                {
-                    Massmap[i, j].Threshold = floats;
-                }
-            }
-
             //島の生成
             int[,] isleMap = new MazeCreator_Extend((range.End.X - range.Start.X + 2) * 2, (range.End.Y - range.Start.Y + 2) * 2, PercentageOfMt).CreateMaze();
             //島に城を二つづつ配置
@@ -107,6 +118,23 @@ public class TilemapGenerator_Extend : MonoBehaviour
                     map[x, y] = isleMap[x - range.Start.X * 2, y - range.Start.Y * 2];
                 }
             }
+
+            //バイオームの決定
+            int biome = Random.Range(0, Chips.Count);
+            List<float> floats = new List<float>();
+            for (var i = 0; i < Chips[biome].Count; i++)
+            {
+                floats.Add(Random.Range(Chips[biome][i].Key.Key, Chips[biome][i].Key.Value));
+            }
+
+            for (int i = (range.Start.X * 2) * Magnification + OutSea; i < (range.End.X * 2 + 4) * Magnification + OutSea; i++)
+            {
+                for (int j = (range.Start.Y * 2) * Magnification + OutSea; j < (range.End.Y * 2 + 4) * Magnification + OutSea; j++)
+                {
+                    Massmap[i, j].Threshold = floats;
+                }
+            }
+
         }
 
         //高度の生成
@@ -218,7 +246,7 @@ public class TilemapGenerator_Extend : MonoBehaviour
                 if (Massmap[i, j].hasBridge)
                 {
                     tilemap.SetTile(position, BridgeTile);
-                    seaTilemap.SetTile(position, Chips[Chips.Count - 1].Value);
+                    seaTilemap.SetTile(position, Chips[0][Chips.Count - 1].Value);
                     continue;
                 }
                 else if (Massmap[i, j].IsRoad)
@@ -230,20 +258,21 @@ public class TilemapGenerator_Extend : MonoBehaviour
                 else
                 {
                     int counter = Massmap[i, j].getTerrainType();
+                    int biome = Massmap[i, j].Biome;
                     switch (counter)
                     {
                         case 0:
-                            mountainTilemap.SetTile(position, Chips[0].Value);
+                            mountainTilemap.SetTile(position, Chips[biome][0].Value);
                             break;
                         case -1:
-                            seaTilemap.SetTile(position, Chips[Chips.Count - 1].Value);
+                            seaTilemap.SetTile(position, Chips[biome][Chips.Count - 1].Value);
                             break;
                         default:
                             if (counter == Chips.Count - 1)
-                                seaTilemap.SetTile(position, Chips[Chips.Count - 1].Value);
+                                seaTilemap.SetTile(position, Chips[biome][Chips.Count - 1].Value);
 
                             else
-                                tilemap.SetTile(position, Chips[counter].Value);
+                                tilemap.SetTile(position, Chips[biome][counter].Value);
                             break;
                     }
                 }
@@ -279,13 +308,13 @@ public class TilemapGenerator_Extend : MonoBehaviour
         {
             bool ran = Random.Range(0, 2) == 1;
             // 縦 → 横 の順番で部屋を区切っていく。一つも区切らなかったら終了
-            isDevided = DevideRange(ran);
+            isDevided = DevideRange(false);
             // もしくは最大区画数を超えたら終了
             if (isDevided && rangeList.Count >= maxRoom)
             {
                 break;
             }
-            isDevided = DevideRange(!ran) || isDevided;
+            isDevided = DevideRange(true) || isDevided;
 
             // もしくは最大区画数を超えたら終了
             if (rangeList.Count >= maxRoom)
