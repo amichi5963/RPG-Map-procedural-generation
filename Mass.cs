@@ -11,7 +11,6 @@ public class Mass
         Threshold = new List<float>();
         hasBridge = false;
         IsRoad = false;
-        Biome = 0;
     }
     public Mass(int x, int y)
     {
@@ -20,14 +19,16 @@ public class Mass
         Threshold = new List<float>();
         hasBridge = false;
         IsRoad = false;
-        Biome = 0;
     }
     public Position Pos { get; set; }
     public float Height { get; set; }
     public List<float> Threshold { get; set; }
     public bool hasBridge { get; set; }
     public bool IsRoad { get; set; }
-    public int Biome { get; set; }
+    public void setThreshold(List<float> _threshold)
+    {
+        Threshold = _threshold;
+    }
     public int getTerrainType()
     {
         for (int i = 0; i < Threshold.Count; i++)
