@@ -167,32 +167,38 @@ public class TilemapGenerator_Extend : MonoBehaviour
         //橋の記述
         foreach (var range in bridgeList)
         {
-            bool isVertical = range.GetWidthY() > 1;
-
-            for (int i = (range.Start.X * 2 + 1) * Magnification + OutSea; i <= (range.End.X * 2 + 1) * Magnification + OutSea; i++)
+            Position start = new((range.Start.X * 2 + 1) * Magnification + OutSea, (range.Start.Y * 2 + 1) * Magnification + OutSea);
+            Position end = new((range.End.X * 2 + 1) * Magnification + OutSea, (range.End.Y * 2 + 1) * Magnification + OutSea);
+            Range range1 = new(start.X - Magnification, start.Y - Magnification, end.X + Magnification, end.Y + Magnification);
+            if (!IsPathExist(Massmap[start.X, start.Y], Massmap[end.X, end.Y], range1))
             {
-                for (int j = (range.Start.Y * 2 + 1) * Magnification + OutSea; j <= (range.End.Y * 2 + 1) * Magnification + OutSea; j++)
+                bool isVertical = range.GetWidthY() > 1;
+
+                for (int i = start.X; i <= end.X; i++)
                 {
-                    //そのマスが通行不能である場合　橋をかける
-                    if (!Massmap[i, j].CanWalk())
+                    for (int j = start.Y; j <= end.Y; j++)
                     {
-                        bool needs = true;
-                        if (isVertical)
+                        //そのマスが通行不能である場合　橋をかける
+                        if (!Massmap[i, j].CanWalk())
                         {
-                            if (Massmap[i + 1, j - 1].CanWalk() && Massmap[i + 1, j].CanWalk() && Massmap[i + 1, j + 1].CanWalk())
-                                needs = false;
-                            else if (Massmap[i - 1, j - 1].CanWalk() && Massmap[i - 1, j].CanWalk() && Massmap[i - 1, j + 1].CanWalk())
-                                needs = false;
+                            bool needs = true;
+                            if (isVertical)
+                            {
+                                if (Massmap[i + 1, j - 1].CanWalk() && Massmap[i + 1, j].CanWalk() && Massmap[i + 1, j + 1].CanWalk())
+                                    needs = false;
+                                else if (Massmap[i - 1, j - 1].CanWalk() && Massmap[i - 1, j].CanWalk() && Massmap[i - 1, j + 1].CanWalk())
+                                    needs = false;
+                            }
+                            else
+                            {
+                                if (Massmap[i - 1, j + 1].CanWalk() && Massmap[i, j + 1].CanWalk() && Massmap[i + 1, j + 1].CanWalk())
+                                    needs = false;
+                                else if (Massmap[i - 1, j - 1].CanWalk() && Massmap[i, j - 1].CanWalk() && Massmap[i + 1, j - 1].CanWalk())
+                                    needs = false;
+                            }
+                            if (needs)
+                                Massmap[i, j].hasBridge = true;
                         }
-                        else
-                        {
-                            if (Massmap[i - 1, j + 1].CanWalk() && Massmap[i, j + 1].CanWalk() && Massmap[i + 1, j + 1].CanWalk())
-                                needs = false;
-                            else if (Massmap[i - 1, j - 1].CanWalk() && Massmap[i, j - 1].CanWalk() && Massmap[i + 1, j - 1].CanWalk())
-                                needs = false;
-                        }
-                        if (needs)
-                            Massmap[i, j].hasBridge = true;
                     }
                 }
             }
@@ -265,6 +271,19 @@ public class TilemapGenerator_Extend : MonoBehaviour
             foreach (var p in positionArray)
             {
                 tilemap.SetTile(p, TownTile);
+            }
+        }
+        for (int x = 0; x < MAP_SIZE_X - 1; x++)
+        {
+            for (int y = 0; y < MAP_SIZE_Y - 1; y++)
+            {
+                //いったんグリッドごとに洞窟を生成
+                if (x % 2 == 1 && y % 2 == 1)
+                {
+                    Vector3Int p = new Vector3Int(x*Magnification+OutSea, y * Magnification + OutSea, 0);
+
+                    tilemap.SetTile(p, TownTile);
+                }
             }
         }
     }
@@ -391,7 +410,6 @@ public class TilemapGenerator_Extend : MonoBehaviour
         Position n = new Position();
         int sx, sy;
 
-        tilemap.ClearAllTiles();
         Position[,] direction = new Position[w, h]; // 辿ってきた方向を記憶する配列(要素はd[4]のどれか)
         Position[] d = new Position[4]{new Position(0, 1),
                     new Position(0, -1),
@@ -481,6 +499,99 @@ public class TilemapGenerator_Extend : MonoBehaviour
         }
         Debug.Log("I cannot find the goal...");
         return meiro;
+    }
+    // 始点から終点までの経路が存在するかどうかを判定するBFSアルゴリズム
+    private bool IsPathExist(Mass start, Mass target, Range range)
+    {
+
+        // 始点または終点が移動不可能な場合、移動可能な近接四マスに移動。それも出来ない場合経路は存在しないとみなす
+        if (!start.CanWalk())
+        {
+            // 上下左右の隣接するマスをチェック
+            foreach (Mass neighbor in GetNeighbors(start, range))
+            {
+                if (neighbor.CanWalk())
+                {
+                    start = neighbor;
+                    break;
+                }
+            }
+            if (!start.CanWalk()) return false;
+        }
+        if (!target.CanWalk())
+        {
+            // 上下左右の隣接するマスをチェック
+            foreach (Mass neighbor in GetNeighbors(target, range))
+            {
+                if (neighbor.CanWalk())
+                {
+                    target = neighbor;
+                    break;
+                }
+            }
+            if (!target.CanWalk()) return false;
+        }
+
+        if (!range.ContainsPosition(start.Pos) || !range.ContainsPosition(target.Pos))
+        {
+            // 始点または終点がrangeに含まれない場合、経路は存在しないとみなす
+            return false;
+        }
+
+        Queue<Mass> queue = new Queue<Mass>();
+        HashSet<Mass> visited = new HashSet<Mass>();
+
+        queue.Enqueue(start);
+        visited.Add(start);
+
+        while (queue.Count > 0)
+        {
+            Mass current = queue.Dequeue();
+
+            if (current == target)
+            {
+                Debug.Log("いいよ～");
+                // 終点に到達したら経路が存在するとみなす
+                return true;
+            }
+
+            // 上下左右の隣接するマスをチェック
+            foreach (Mass neighbor in GetNeighbors(current, range))
+            {
+                if (!visited.Contains(neighbor) && neighbor.CanWalk())
+                {
+                    queue.Enqueue(neighbor);
+                    visited.Add(neighbor);
+                }
+            }
+        }
+
+        // 終点に到達できなかった場合は経路が存在しないとみなす
+        return false;
+    }
+    // 指定したマスの上下左右の隣接するマスを取得
+    private List<Mass> GetNeighbors(Mass cell, Range grid)
+    {
+        List<Mass> neighbors = new List<Mass>();
+
+        Position[] d = new Position[4]{new Position(0, 1),
+                    new Position(0, -1),
+                    new Position(1, 0),
+                    new Position(-1, 0)}; // 進む方向	
+        shuffle(d);
+
+        for (int i = 0; i < 4; i++)
+        {
+            int nx = cell.Pos.X + d[i].X;
+            int ny = cell.Pos.Y + d[i].Y;
+
+            if (grid.ContainsPosition(new Position(nx, ny)))
+            {
+                neighbors.Add(Massmap[nx, ny]);
+            }
+        }
+
+        return neighbors;
     }
     public static float BilinearInterpolation(float x, float y, float q11, float q12, float q21, float q22)
     {
