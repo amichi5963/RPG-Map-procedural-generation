@@ -12,6 +12,7 @@ public class TilemapGenerator_Extend : MonoBehaviour
     [SerializeField] private RuleTile BridgeTile;
     [SerializeField] private RuleTile TownTile;
     [SerializeField] Grid grid;
+    [SerializeField] GameObject Enemy;
     [SerializeField] Tilemap tilemap;
     [SerializeField] Tilemap seaTilemap;
     [SerializeField] Tilemap mountainTilemap;
@@ -164,6 +165,17 @@ public class TilemapGenerator_Extend : MonoBehaviour
                 }
             }
         }
+        for (int x = 0; x < MAP_SIZE_X - 1; x++)
+        {
+            for (int y = 0; y < MAP_SIZE_Y - 1; y++)
+            {
+                //いったんグリッドごとに洞窟を生成
+                if (x % 2 == 1 && y % 2 == 1)
+                {
+                    Massmap[x * Magnification + OutSea, y * Magnification + OutSea].HasEvent = true;
+                }
+            }
+        }
         //橋の記述
         foreach (var range in bridgeList)
         {
@@ -197,7 +209,7 @@ public class TilemapGenerator_Extend : MonoBehaviour
                                     needs = false;
                             }
                             if (needs)
-                                Massmap[i, j].hasBridge = true;
+                                Massmap[i, j].HasBridge = true;
                         }
                     }
                 }
@@ -220,16 +232,27 @@ public class TilemapGenerator_Extend : MonoBehaviour
             for (int j = 0; j < Massmap.GetLength(1); j++)
             {
                 Vector3Int position = new Vector3Int(i, j, 0);
-
-                if (Massmap[i, j].hasBridge)
+                if (Massmap[i, j].HasEvent)
                 {
-                    tilemap.SetTile(position, BridgeTile);
-                    seaTilemap.SetTile(position, Chips[Chips.Count - 1].Value);
+                    tilemap.SetTile(position, TownTile);
+                    Instantiate(Enemy, position, Quaternion.identity);
+                    continue;
+                }
+                else if (Massmap[i, j].HasBridge)
+                {
+                    if (Massmap[i, j].getTerrainType() == 0)
+                    {
+                        tilemap.SetTile(position, Chips[1].Value);
+                    }
+                    else
+                    {
+                        tilemap.SetTile(position, BridgeTile);
+                        seaTilemap.SetTile(position, Chips[Chips.Count - 1].Value);
+                    }
                     continue;
                 }
                 else if (Massmap[i, j].IsRoad)
                 {
-                    Debug.Log("Road");
                     tilemap.SetTile(position, BridgeTile);
                     continue;
                 }
@@ -273,19 +296,6 @@ public class TilemapGenerator_Extend : MonoBehaviour
                 tilemap.SetTile(p, TownTile);
             }
         }
-        for (int x = 0; x < MAP_SIZE_X - 1; x++)
-        {
-            for (int y = 0; y < MAP_SIZE_Y - 1; y++)
-            {
-                //いったんグリッドごとに洞窟を生成
-                if (x % 2 == 1 && y % 2 == 1)
-                {
-                    Vector3Int p = new Vector3Int(x*Magnification+OutSea, y * Magnification + OutSea, 0);
-
-                    tilemap.SetTile(p, TownTile);
-                }
-            }
-        }
     }
 
     public void CreateRange(int maxRoom)
@@ -313,7 +323,6 @@ public class TilemapGenerator_Extend : MonoBehaviour
             }
         } while (isDevided);
 
-        Debug.Log(rangeList.Count);
     }
     public bool DevideRange(bool isVertical)
     {
@@ -550,7 +559,6 @@ public class TilemapGenerator_Extend : MonoBehaviour
 
             if (current == target)
             {
-                Debug.Log("いいよ～");
                 // 終点に到達したら経路が存在するとみなす
                 return true;
             }

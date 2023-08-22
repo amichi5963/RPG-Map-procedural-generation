@@ -9,22 +9,25 @@ public class Mass
         Pos = new Position(0, 0);
         Height = 0f;
         Threshold = new List<float>();
-        hasBridge = false;
+        HasBridge = false;
         IsRoad = false;
+        HasEvent=false;
     }
     public Mass(int x, int y)
     {
         Pos = new Position(x, y);
         Height = 0f;
         Threshold = new List<float>();
-        hasBridge = false;
+        HasBridge = false;
         IsRoad = false;
+        HasEvent = false;
     }
     public Position Pos { get; set; }
     public float Height { get; set; }
     public List<float> Threshold { get; set; }
-    public bool hasBridge { get; set; }
+    public bool HasBridge { get; set; }
     public bool IsRoad { get; set; }
+    public bool HasEvent { get; set; }
     public void setThreshold(List<float> _threshold)
     {
         Threshold = _threshold;
@@ -39,7 +42,7 @@ public class Mass
     }
     public bool CanWalk()
     {
-        return ((getTerrainType() < Threshold.Count-1 && getTerrainType() > 0) || hasBridge);
+        return ((getTerrainType() < Threshold.Count-1 && getTerrainType() > 0) || HasBridge||HasEvent);
     }
     public int Walkability()
     {
